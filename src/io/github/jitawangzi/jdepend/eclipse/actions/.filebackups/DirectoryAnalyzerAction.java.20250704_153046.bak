@@ -1,0 +1,136 @@
+package io.github.jitawangzi.jdepend.eclipse.actions;
+
+import org.eclipse.core.resources.IFolder;
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.IResource;
+import org.eclipse.jface.action.IAction;
+import org.eclipse.jface.dialogs.MessageDialog;
+import org.eclipse.jface.viewers.ISelection;
+import org.eclipse.jface.viewers.IStructuredSelection;
+import org.eclipse.jface.window.Window;
+import org.eclipse.swt.widgets.Shell;
+import org.eclipse.ui.IObjectActionDelegate;
+import org.eclipse.ui.IWorkbenchPart;
+
+import io.github.jitawangzi.jdepend.eclipse.config.PluginConfig;
+import io.github.jitawangzi.jdepend.eclipse.dialogs.ConfigurationDialog;
+import io.github.jitawangzi.jdepend.eclipse.utils.EclipseProjectUtils;
+
+import java.lang.reflect.Method;
+
+/**
+ * 目录分析器动作
+ */
+public class DirectoryAnalyzerAction implements IObjectActionDelegate {
+    
+    private Shell shell;
+    private IResource selectedResource;
+    
+    @Override
+    public void setActivePart(IAction action, IWorkbenchPart targetPart) {
+        shell = targetPart.getSite().getShell();
+    }
+    
+    @Override
+    public void selectionChanged(IAction action, ISelection selection) {
+        selectedResource = null;
+        if (selection instanceof IStructuredSelection) {
+            IStructuredSelection structuredSelection = (IStructuredSelection) selection;
+            Object firstElement = structuredSelection.getFirstElement();
+            
+            if (firstElement instanceof IFolder || firstElement instanceof IProject) {
+                selectedResource = (IResource) firstElement;
+            }
+        }
+    }
+    
+    @Override
+    public void run(IAction action) {
+        if (selectedResource == null) {
+            MessageDialog.openError(shell, "Error", "Please select a folder or project.");
+            return;
+        }
+        
+        try {
+            // 准备默认配置
+            PluginConfig config = new PluginConfig();
+            
+            // 从选中的资源推断配置
+            String directoryPath = EclipseProjectUtils.getResourcePath(selectedResource);
+            
+            config.setDirectoryPath(directoryPath);
+            
+            // 显示配置对话框
+            ConfigurationDialog dialog = new ConfigurationDialog(shell, config, false, directoryPath);
+            if (dialog.open() == Window.OK) {
+                // 获取配置并执行分析
+                PluginConfig finalConfig = dialog.getConfig();
+                executeDirectoryAnalysis(finalConfig);
+            }
+            
+        } catch (Exception e) {
+            MessageDialog.openError(shell, "Error", "Failed to analyze directory: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    private void executeDirectoryAnalysis(PluginConfig config) {
+        try {
+            // 设置系统属性
+            setSystemPropertiesFromConfig(config, false);
+            
+            // 调用原始的DirectoryAnalyzer.main方法
+            Class<?> directoryAnalyzerClass = Class.forName("io.github.jitawangzi.jdepend.DirectoryAnalyzer");
+            Method mainMethod = directoryAnalyzerClass.getMethod("main", String[].class);
+            
+            // 在后台线程中执行分析
+            Thread analysisThread = new Thread(() -> {
+                try {
+                    mainMethod.invoke(null, (Object) new String[0]);
+                    
+                    // 分析完成后在UI线程中显示结果
+                    shell.getDisplay().asyncExec(() -> {
+                        MessageDialog.openInformation(shell, "Success", 
+                            "Directory analysis completed successfully!\nOutput saved to: " + config.getOutputFile());
+                    });
+                } catch (Exception e) {
+                    shell.getDisplay().asyncExec(() -> {
+                        MessageDialog.openError(shell, "Error", 
+                            "Analysis failed: " + e.getCause().getMessage());
+                    });
+                    e.printStackTrace();
+                }
+            });
+            
+            analysisThread.start();
+            
+        } catch (Exception e) {
+            MessageDialog.openError(shell, "Error", "Failed to execute analysis: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    private void setSystemPropertiesFromConfig(PluginConfig config, boolean isClassMode) {
+        if (!isClassMode) {
+            System.setProperty("directory.path", config.getDirectoryPath());
+            System.setProperty("simplify.methods", String.valueOf(config.isSimplifyMethods()));
+            System.setProperty("directory.include.files", config.getDirectoryIncludeFiles());
+            System.setProperty("directory.exclude.files", config.getDirectoryExcludeFiles());
+            System.setProperty("directory.include.folders", config.getDirectoryIncludeFolders());
+            System.setProperty("directory.exclude.folders", config.getDirectoryExcludeFolders());
+            System.setProperty("directory.allowed.extensions", config.getDirectoryAllowedExtensions());
+        }
+        
+        System.setProperty("output.file", config.getOutputFile());
+        System.setProperty("max.depth", String.valueOf(config.getMaxDepth()));
+        System.setProperty("excluded.packages", config.getExcludedPackages());
+        System.setProperty("method.exceptions", config.getMethodExceptions());
+        System.setProperty("content.size.threshold", String.valueOf(config.getContentSizeThreshold()));
+        System.setProperty("omit.bean.methods", String.valueOf(config.isOmitBeanMethods()));
+        System.setProperty("show.omitted.accessors", String.valueOf(config.isShowOmittedAccessors()));
+        System.setProperty("import.skip.enabled", String.valueOf(config.isImportSkipEnabled()));
+        System.setProperty("import.skip.prefixes", config.getImportSkipPrefixes());
+        System.setProperty("import.keep.prefixes", config.getImportKeepPrefixes());
+        System.setProperty("show.error.stacktrace", String.valueOf(config.isShowErrorStacktrace()));
+    }
+}

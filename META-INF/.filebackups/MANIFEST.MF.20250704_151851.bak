@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: Prompt-test
+Bundle-SymbolicName: prompt-test
+Bundle-Version: 1.0.0.qualifier
+Automatic-Module-Name: prompt.test
+Bundle-RequiredExecutionEnvironment: JavaSE-21

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+   <extension point="org.eclipse.ui.popupMenus">
+      <!-- 右键Java类时的菜单 -->
+      <objectContribution
+            adaptable="true"
+            id="io.github.jitawangzi.jdepend.eclipse.javaClassContribution"
+            objectClass="org.eclipse.jdt.core.ICompilationUnit">
+         <menu
+               id="io.github.jitawangzi.jdepend.eclipse.menu"
+               label="Java Dependency Analyzer"
+               path="additions">
+            <separator name="group1"/>
+         </menu>
+         <action
+               class="io.github.jitawangzi.jdepend.eclipse.actions.ClassAnalyzerAction"
+               id="io.github.jitawangzi.jdepend.eclipse.classAnalyzer"
+               label="Analyze Class Dependencies"
+               menubarPath="io.github.jitawangzi.jdepend.eclipse.menu/group1"
+               icon="icons/class_analyzer.png">
+         </action>
+      </objectContribution>
+      
+      <!-- 右键目录时的菜单 -->
+      <objectContribution
+            adaptable="true"
+            id="io.github.jitawangzi.jdepend.eclipse.folderContribution"
+            objectClass="org.eclipse.core.resources.IFolder">
+         <menu
+               id="io.github.jitawangzi.jdepend.eclipse.menu"
+               label="Java Dependency Analyzer"
+               path="additions">
+            <separator name="group1"/>
+         </menu>
+         <action
+               class="io.github.jitawangzi.jdepend.eclipse.actions.DirectoryAnalyzerAction"
+               id="io.github.jitawangzi.jdepend.eclipse.directoryAnalyzer"
+               label="Analyze Directory Files"
+               menubarPath="io.github.jitawangzi.jdepend.eclipse.menu/group1"
+               icon="icons/directory_analyzer.png">
+         </action>
+      </objectContribution>
+      
+      <!-- 右键项目时的菜单 -->
+      <objectContribution
+            adaptable="true"
+            id="io.github.jitawangzi.jdepend.eclipse.projectContribution"
+            objectClass="org.eclipse.core.resources.IProject">
+         <menu
+               id="io.github.jitawangzi.jdepend.eclipse.menu"
+               label="Java Dependency Analyzer"
+               path="additions">
+            <separator name="group1"/>
+         </menu>
+         <action
+               class="io.github.jitawangzi.jdepend.eclipse.actions.DirectoryAnalyzerAction"
+               id="io.github.jitawangzi.jdepend.eclipse.projectAnalyzer"
+               label="Analyze Project Files"
+               menubarPath="io.github.jitawangzi.jdepend.eclipse.menu/group1"
+               icon="icons/directory_analyzer.png">
+         </action>
+      </objectContribution>
+   </extension>
+</plugin>
+

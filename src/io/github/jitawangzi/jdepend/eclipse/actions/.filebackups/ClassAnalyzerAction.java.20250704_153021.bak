@@ -1,0 +1,151 @@
+package io.github.jitawangzi.jdepend.eclipse.actions;
+
+import org.eclipse.core.resources.IFile;
+import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.JavaCore;
+import org.eclipse.jface.action.IAction;
+import org.eclipse.jface.dialogs.MessageDialog;
+import org.eclipse.jface.viewers.ISelection;
+import org.eclipse.jface.viewers.IStructuredSelection;
+import org.eclipse.jface.window.Window;
+import org.eclipse.swt.widgets.Shell;
+import org.eclipse.ui.IObjectActionDelegate;
+import org.eclipse.ui.IWorkbenchPart;
+
+import io.github.jitawangzi.jdepend.eclipse.config.PluginConfig;
+import io.github.jitawangzi.jdepend.eclipse.dialogs.ConfigurationDialog;
+import io.github.jitawangzi.jdepend.eclipse.utils.EclipseProjectUtils;
+
+import java.lang.reflect.Method;
+
+/**
+ * 类分析器动作
+ */
+public class ClassAnalyzerAction implements IObjectActionDelegate {
+    
+    private Shell shell;
+    private ICompilationUnit selectedUnit;
+    
+    @Override
+    public void setActivePart(IAction action, IWorkbenchPart targetPart) {
+        shell = targetPart.getSite().getShell();
+    }
+    
+    @Override
+    public void selectionChanged(IAction action, ISelection selection) {
+        selectedUnit = null;
+        if (selection instanceof IStructuredSelection) {
+            IStructuredSelection structuredSelection = (IStructuredSelection) selection;
+            Object firstElement = structuredSelection.getFirstElement();
+            
+            if (firstElement instanceof IFile) {
+                IFile file = (IFile) firstElement;
+                if ("java".equals(file.getFileExtension())) {
+                    selectedUnit = JavaCore.createCompilationUnitFrom(file);
+                }
+            } else if (firstElement instanceof ICompilationUnit) {
+                selectedUnit = (ICompilationUnit) firstElement;
+            }
+        }
+    }
+    
+    @Override
+    public void run(IAction action) {
+        if (selectedUnit == null) {
+            MessageDialog.openError(shell, "Error", "Please select a Java class file.");
+            return;
+        }
+        
+        try {
+            // 准备默认配置
+            PluginConfig config = new PluginConfig();
+            
+            // 从选中的类推断配置
+            String className = EclipseProjectUtils.getFullyQualifiedClassName(selectedUnit);
+            String projectRoot = EclipseProjectUtils.getProjectRootPath(selectedUnit.getResource());
+            String packagePrefixes = EclipseProjectUtils.inferPackagePrefixes(selectedUnit);
+            String sourceDirectories = EclipseProjectUtils.getSourceDirectories(selectedUnit);
+            
+            config.setMainClass(className);
+            config.setProjectRoot(projectRoot);
+            config.setProjectPackagePrefixes(packagePrefixes);
+            config.setSourceDirectories(sourceDirectories);
+            
+            // 显示配置对话框
+            ConfigurationDialog dialog = new ConfigurationDialog(shell, config, true, className);
+            if (dialog.open() == Window.OK) {
+                // 获取配置并执行分析
+                PluginConfig finalConfig = dialog.getConfig();
+                executeClassAnalysis(finalConfig);
+            }
+            
+        } catch (Exception e) {
+            MessageDialog.openError(shell, "Error", "Failed to analyze class: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    private void executeClassAnalysis(PluginConfig config) {
+        try {
+            // 这里需要调用你原始的ClassAnalyzer
+            // 由于需要保持独立性，我们通过反射调用
+            
+            // 首先设置系统属性或使用其他方式传递配置
+            setSystemPropertiesFromConfig(config, true);
+            
+            // 调用原始的ClassAnalyzer.main方法
+            Class<?> classAnalyzerClass = Class.forName("io.github.jitawangzi.jdepend.ClassAnalyzer");
+            Method mainMethod = classAnalyzerClass.getMethod("main", String[].class);
+            
+            // 在后台线程中执行分析
+            Thread analysisThread = new Thread(() -> {
+                try {
+                    mainMethod.invoke(null, (Object) new String[0]);
+                    
+                    // 分析完成后在UI线程中显示结果
+                    shell.getDisplay().asyncExec(() -> {
+                        MessageDialog.openInformation(shell, "Success", 
+                            "Class analysis completed successfully!\nOutput saved to: " + config.getOutputFile());
+                    });
+                } catch (Exception e) {
+                    shell.getDisplay().asyncExec(() -> {
+                        MessageDialog.openError(shell, "Error", 
+                            "Analysis failed: " + e.getCause().getMessage());
+                    });
+                    e.printStackTrace();
+                }
+            });
+            
+            analysisThread.start();
+            
+        } catch (Exception e) {
+            MessageDialog.openError(shell, "Error", "Failed to execute analysis: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    private void setSystemPropertiesFromConfig(PluginConfig config, boolean isClassMode) {
+        if (isClassMode) {
+            System.setProperty("main.class", config.getMainClass());
+            System.setProperty("project.root", config.getProjectRoot());
+            System.setProperty("project.package.prefixes", config.getProjectPackagePrefixes());
+            System.setProperty("method.body.max.depth", String.valueOf(config.getMethodBodyMaxDepth()));
+            System.setProperty("keep.only.referenced.methods", String.valueOf(config.isKeepOnlyReferencedMethods()));
+            System.setProperty("show.removed.methods", String.valueOf(config.isShowRemovedMethods()));
+            System.setProperty("source.directories", config.getSourceDirectories());
+        }
+        
+        System.setProperty("output.file", config.getOutputFile());
+        System.setProperty("max.depth", String.valueOf(config.getMaxDepth()));
+        System.setProperty("excluded.packages", config.getExcludedPackages());
+        System.setProperty("method.exceptions", config.getMethodExceptions());
+        System.setProperty("content.size.threshold", String.valueOf(config.getContentSizeThreshold()));
+        System.setProperty("omit.bean.methods", String.valueOf(config.isOmitBeanMethods()));
+        System.setProperty("show.omitted.accessors", String.valueOf(config.isShowOmittedAccessors()));
+        System.setProperty("import.skip.enabled", String.valueOf(config.isImportSkipEnabled()));
+        System.setProperty("import.skip.prefixes", config.getImportSkipPrefixes());
+        System.setProperty("import.keep.prefixes", config.getImportKeepPrefixes());
+        System.setProperty("show.error.stacktrace", String.valueOf(config.isShowErrorStacktrace()));
+    }
+}
+

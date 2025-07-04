@@ -1,0 +1,12 @@
+/logs
+/bin
+/dist
+/bin/*
+/target/
+/.settings/*
+.settings
+/build
+/.classpath
+/.project
+/src/main/resources/xml
+/.idea
