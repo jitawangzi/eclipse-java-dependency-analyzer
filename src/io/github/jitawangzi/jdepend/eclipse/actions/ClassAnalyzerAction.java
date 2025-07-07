@@ -1,5 +1,8 @@
 package io.github.jitawangzi.jdepend.eclipse.actions;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+
 import org.eclipse.core.resources.IFile;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.JavaCore;
@@ -17,7 +20,7 @@ import io.github.jitawangzi.jdepend.eclipse.dialogs.ConfigurationDialog;
 import io.github.jitawangzi.jdepend.eclipse.utils.EclipseProjectUtils;
 
 /**
- * 类分析器动作 - 带调试信息版本
+ * 类分析器动作 - 使用系统属性传参版本
  */
 public class ClassAnalyzerAction implements IObjectActionDelegate {
     
@@ -71,11 +74,15 @@ public class ClassAnalyzerAction implements IObjectActionDelegate {
             config.setProjectPackagePrefixes(packagePrefixes);
             config.setSourceDirectories(sourceDirectories);
             
+            // 设置输出文件到项目目录
+            config.setOutputFileWithProjectPath(projectRoot, "dependency-analysis.md");
+            
             debugInfo("配置信息:\n" +
                 "主类: " + className + "\n" +
                 "项目根路径: " + projectRoot + "\n" +
                 "包前缀: " + packagePrefixes + "\n" +
-                "源码目录: " + sourceDirectories);
+                "源码目录: " + sourceDirectories + "\n" +
+                "输出文件: " + config.getAbsoluteOutputFile());
             
             // 显示配置对话框
             ConfigurationDialog dialog = new ConfigurationDialog(shell, config, true, className);
@@ -199,29 +206,129 @@ public class ClassAnalyzerAction implements IObjectActionDelegate {
                 throw e;
             }
             
+            debugInfo("=== 测试Java分析工程 ===");
+            
+            // 保存原始工作目录
+            String originalUserDir = System.getProperty("user.dir");
+            debugInfo("原始工作目录: " + originalUserDir);
+            
+            // 设置工作目录到项目根目录
+            String projectRoot = config.getProjectRoot();
+            if (projectRoot != null && !projectRoot.trim().isEmpty()) {
+                System.setProperty("user.dir", projectRoot);
+                debugInfo("设置工作目录为: " + projectRoot);
+            }
+            
+            // 检查所有系统属性是否正确设置
+            debugInfo("系统属性检查:");
+            java.util.Properties props = System.getProperties();
+            for (String key : props.stringPropertyNames()) {
+                if (key.startsWith("main.class") || key.startsWith("project.") || 
+                    key.startsWith("output.") || key.startsWith("method.") ||
+                    key.startsWith("excluded.") || key.startsWith("import.") ||
+                    key.startsWith("directory.") || key.startsWith("source.") ||
+                    key.startsWith("keep.") || key.startsWith("show.") ||
+                    key.startsWith("omit.") || key.startsWith("content.") ||
+                    key.startsWith("simplify.") || key.equals("user.dir")) {
+                    debugInfo("  " + key + " = " + props.getProperty(key));
+                }
+            }
+            
             debugInfo("=== 准备调用main方法 ===");
-            debugInfo("输出文件: " + config.getOutputFile());
+            String absoluteOutputFile = config.getAbsoluteOutputFile();
+            debugInfo("输出文件: " + absoluteOutputFile);
             
             // 显示即将开始分析的信息
             shell.getDisplay().asyncExec(() -> {
                 MessageDialog.openInformation(shell, "Analysis Started", 
                     "开始执行类分析...\n" +
                     "主类: " + config.getMainClass() + "\n" +
-                    "输出文件: " + config.getOutputFile() + "\n\n" +
+                    "输出文件: " + absoluteOutputFile + "\n\n" +
                     "详细调试信息请查看控制台");
             });
             
-            // 调用main方法
-            mainMethod.invoke(null, (Object) new String[0]);
+            try {
+                // 调用main方法
+                mainMethod.invoke(null, (Object) new String[0]);
+                debugInfo("=== main方法调用完成 ===");
+                
+            } finally {
+                // 恢复原始工作目录
+                System.setProperty("user.dir", originalUserDir);
+                debugInfo("恢复工作目录为: " + originalUserDir);
+            }
             
-            debugInfo("=== main方法调用完成 ===");
+            // 检查文件是否生成
+            debugInfo("检查输出文件: " + absoluteOutputFile);
+            
+            java.io.File file = new java.io.File(absoluteOutputFile);
+            debugInfo("文件绝对路径: " + file.getAbsolutePath());
+            debugInfo("文件是否存在: " + file.exists());
+            
+            // 如果目标位置没有文件，检查项目根目录下是否有
+            if (!file.exists()) {
+                debugInfo("目标位置没有文件，检查项目根目录...");
+                java.io.File projectDir = new java.io.File(config.getProjectRoot());
+                if (projectDir.exists()) {
+                    java.io.File[] projectFiles = projectDir.listFiles();
+                    if (projectFiles != null) {
+                        for (java.io.File f : projectFiles) {
+                            if (f.getName().endsWith(".md")) {
+                                debugInfo("  项目根目录中发现MD文件: " + f.getName() + " (" + f.length() + " bytes)");
+                                
+                                // 如果是我们期望的文件名但位置不对，尝试移动
+                                if (f.getName().equals("dependency-analysis.md") || f.getName().equals("output.md")) {
+                                    try {
+                                        java.nio.file.Files.copy(f.toPath(), file.toPath(), 
+                                            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                                        debugInfo("  文件已复制到目标位置: " + file.getAbsolutePath());
+                                        f.delete(); // 删除原文件
+                                        break;
+                                    } catch (Exception e) {
+                                        debugError("复制文件失败", e);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 再次检查文件
+            debugInfo("最终检查输出文件: " + absoluteOutputFile);
+            debugInfo("文件是否存在: " + file.exists());
+            
+            if (file.exists()) {
+                debugInfo("文件大小: " + file.length() + " bytes");
+                debugInfo("文件最后修改时间: " + new java.util.Date(file.lastModified()));
+                
+                // 读取文件前几行内容
+                try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(file))) {
+                    debugInfo("文件内容预览:");
+                    String line;
+                    int lineCount = 0;
+                    while ((line = reader.readLine()) != null && lineCount < 10) {
+                        debugInfo("  " + (lineCount + 1) + ": " + line);
+                        lineCount++;
+                    }
+                    if (lineCount == 0) {
+                        debugInfo("  文件为空！");
+                    }
+                } catch (Exception e) {
+                    debugError("读取文件内容失败", e);
+                }
+            } else {
+                debugInfo("文件仍然不存在！请检查控制台的系统属性配置");
+            }
             
             // 分析完成后在UI线程中显示结果
+            final boolean fileExists = file.exists();
             shell.getDisplay().asyncExec(() -> {
                 MessageDialog.openInformation(shell, "Analysis Completed", 
                     "类分析完成！\n" +
-                    "输出文件: " + config.getOutputFile() + "\n\n" +
-                    "请检查输出文件查看结果");
+                    "输出文件: " + absoluteOutputFile + "\n" +
+                    "文件存在: " + fileExists + "\n\n" +
+                    (fileExists ? "请检查项目目录查看分析结果" : "文件生成失败，请查看控制台调试信息"));
             });
             
         } catch (Exception e) {
@@ -268,9 +375,11 @@ public class ClassAnalyzerAction implements IObjectActionDelegate {
             setAndDebugProperty("keep.only.referenced.methods", String.valueOf(config.isKeepOnlyReferencedMethods()));
             setAndDebugProperty("show.removed.methods", String.valueOf(config.isShowRemovedMethods()));
             setAndDebugProperty("source.directories", config.getSourceDirectories());
+            setAndDebugProperty("directory.mode.enabled", "false");
         }
         
-        setAndDebugProperty("output.file", config.getOutputFile());
+        // 使用绝对路径
+        setAndDebugProperty("output.file", config.getAbsoluteOutputFile());
         setAndDebugProperty("max.depth", String.valueOf(config.getMaxDepth()));
         setAndDebugProperty("excluded.packages", config.getExcludedPackages());
         setAndDebugProperty("method.exceptions", config.getMethodExceptions());
@@ -289,13 +398,59 @@ public class ClassAnalyzerAction implements IObjectActionDelegate {
     }
     
     private void debugInfo(String message) {
-        System.out.println("[ClassAnalyzer-DEBUG] " + message);
+        String debugMsg = "[ClassAnalyzer-DEBUG] " + message;
+        
+        // 输出到System.out
+        System.out.println(debugMsg);
+        
+        // 也输出到Eclipse控制台
+        try {
+            org.eclipse.ui.console.IConsoleManager consoleManager = 
+                org.eclipse.ui.console.ConsolePlugin.getDefault().getConsoleManager();
+            
+            org.eclipse.ui.console.MessageConsole targetConsole = null;
+            org.eclipse.ui.console.IConsole[] consoles = consoleManager.getConsoles();
+            
+            for (org.eclipse.ui.console.IConsole existingConsole : consoles) {
+                if ("Java Dependency Analyzer".equals(existingConsole.getName())) {
+                    targetConsole = (org.eclipse.ui.console.MessageConsole) existingConsole;
+                    break;
+                }
+            }
+            
+            if (targetConsole == null) {
+                targetConsole = new org.eclipse.ui.console.MessageConsole("Java Dependency Analyzer", null);
+                consoleManager.addConsoles(new org.eclipse.ui.console.IConsole[]{targetConsole});
+            }
+            
+            org.eclipse.ui.console.MessageConsoleStream stream = targetConsole.newMessageStream();
+            stream.println(debugMsg);
+            
+            // 激活控制台视图 - 使用final变量
+            final org.eclipse.ui.console.MessageConsole finalConsole = targetConsole;
+            shell.getDisplay().asyncExec(() -> {
+                consoleManager.showConsoleView(finalConsole);
+            });
+            
+        } catch (Exception e) {
+            // 如果Eclipse控制台失败，至少保证System.out有输出
+            System.err.println("Failed to write to Eclipse console: " + e.getMessage());
+        }
     }
     
     private void debugError(String message, Exception e) {
-        System.err.println("[ClassAnalyzer-ERROR] " + message);
+        String errorMsg = "[ClassAnalyzer-ERROR] " + message;
+        System.err.println(errorMsg);
         if (e != null) {
             e.printStackTrace();
         }
+
+        final StringWriter sw = new StringWriter();
+        final PrintWriter pw = new PrintWriter(sw, true);
+        e.printStackTrace(pw);
+        String stackTrace = sw.getBuffer().toString();
+    
+        // 也输出到Eclipse控制台
+        debugInfo("ERROR: " + message + (e != null ? " - " + e.getMessage() : "") + "stack trace : " + stackTrace);
     }
 }

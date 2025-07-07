@@ -60,8 +60,18 @@ public class DirectoryAnalyzerAction implements IObjectActionDelegate {
             
             config.setDirectoryPath(directoryPath);
             
+            // 设置输出文件到目录的父目录或项目根目录
+            java.io.File dirFile = new java.io.File(directoryPath);
+            java.io.File parentDir = dirFile.getParentFile();
+            if (parentDir != null) {
+                config.setOutputFileWithProjectPath(parentDir.getAbsolutePath(), "directory-analysis.md");
+            } else {
+                config.setOutputFileWithProjectPath(directoryPath, "directory-analysis.md");
+            }
+            
             debugInfo("配置信息:\n" +
-                "目录路径: " + directoryPath);
+                "目录路径: " + directoryPath + "\n" +
+                "输出文件: " + config.getAbsoluteOutputFile());
             
             // 显示配置对话框
             ConfigurationDialog dialog = new ConfigurationDialog(shell, config, false, directoryPath);
@@ -185,16 +195,30 @@ public class DirectoryAnalyzerAction implements IObjectActionDelegate {
                 throw e;
             }
             
+            debugInfo("=== 测试Java分析工程 ===");
+            
+            // 检查所有系统属性是否正确设置
+            debugInfo("系统属性检查:");
+            java.util.Properties props = System.getProperties();
+            for (String key : props.stringPropertyNames()) {
+                if (key.startsWith("directory.") || key.startsWith("simplify.") || 
+                    key.startsWith("output.") || key.startsWith("max.") ||
+                    key.startsWith("excluded.") || key.startsWith("import.")) {
+                    debugInfo("  " + key + " = " + props.getProperty(key));
+                }
+            }
+            
             debugInfo("=== 准备调用main方法 ===");
+            String absoluteOutputFile = config.getAbsoluteOutputFile();
             debugInfo("目录路径: " + config.getDirectoryPath());
-            debugInfo("输出文件: " + config.getOutputFile());
+            debugInfo("输出文件: " + absoluteOutputFile);
             
             // 显示即将开始分析的信息
             shell.getDisplay().asyncExec(() -> {
                 MessageDialog.openInformation(shell, "Analysis Started", 
                     "开始执行目录分析...\n" +
                     "目录路径: " + config.getDirectoryPath() + "\n" +
-                    "输出文件: " + config.getOutputFile() + "\n\n" +
+                    "输出文件: " + absoluteOutputFile + "\n\n" +
                     "详细调试信息请查看控制台");
             });
             
@@ -203,12 +227,74 @@ public class DirectoryAnalyzerAction implements IObjectActionDelegate {
             
             debugInfo("=== main方法调用完成 ===");
             
+            // 检查文件是否生成
+            debugInfo("检查输出文件: " + absoluteOutputFile);
+            
+            java.io.File file = new java.io.File(absoluteOutputFile);
+            debugInfo("文件绝对路径: " + file.getAbsolutePath());
+            debugInfo("文件是否存在: " + file.exists());
+            
+            if (file.exists()) {
+                debugInfo("文件大小: " + file.length() + " bytes");
+                debugInfo("文件最后修改时间: " + new java.util.Date(file.lastModified()));
+                
+                // 读取文件前几行内容
+                try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(file))) {
+                    debugInfo("文件内容预览:");
+                    String line;
+                    int lineCount = 0;
+                    while ((line = reader.readLine()) != null && lineCount < 10) {
+                        debugInfo("  " + (lineCount + 1) + ": " + line);
+                        lineCount++;
+                    }
+                    if (lineCount == 0) {
+                        debugInfo("  文件为空！");
+                    }
+                } catch (Exception e) {
+                    debugError("读取文件内容失败", e);
+                }
+            } else {
+                debugInfo("文件不存在！");
+                
+                // 检查父目录
+                java.io.File parentDir = file.getParentFile();
+                if (parentDir != null) {
+                    debugInfo("父目录: " + parentDir.getAbsolutePath());
+                    debugInfo("父目录是否存在: " + parentDir.exists());
+                    debugInfo("父目录是否可写: " + parentDir.canWrite());
+                    
+                    if (parentDir.exists()) {
+                        debugInfo("父目录内容:");
+                        java.io.File[] files = parentDir.listFiles();
+                        if (files != null) {
+                            for (java.io.File f : files) {
+                                debugInfo("  - " + f.getName() + (f.isDirectory() ? " (DIR)" : " (" + f.length() + " bytes)"));
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 检查当前工作目录
+            debugInfo("当前工作目录: " + System.getProperty("user.dir"));
+            debugInfo("当前工作目录内容:");
+            java.io.File currentDir = new java.io.File(".");
+            java.io.File[] currentDirFiles = currentDir.listFiles();
+            if (currentDirFiles != null) {
+                for (java.io.File f : currentDirFiles) {
+                    if (f.getName().endsWith(".md") || f.getName().equals("output.md")) {
+                        debugInfo("  - " + f.getName() + " (" + f.length() + " bytes) *** 可能的输出文件 ***");
+                    }
+                }
+            }
+            
             // 分析完成后在UI线程中显示结果
             shell.getDisplay().asyncExec(() -> {
                 MessageDialog.openInformation(shell, "Analysis Completed", 
                     "目录分析完成！\n" +
-                    "输出文件: " + config.getOutputFile() + "\n\n" +
-                    "请检查输出文件查看结果");
+                    "输出文件: " + absoluteOutputFile + "\n" +
+                    "文件存在: " + file.exists() + "\n\n" +
+                    "请检查项目目录查看分析结果");
             });
             
         } catch (Exception e) {
@@ -257,7 +343,8 @@ public class DirectoryAnalyzerAction implements IObjectActionDelegate {
             setAndDebugProperty("directory.allowed.extensions", config.getDirectoryAllowedExtensions());
         }
         
-        setAndDebugProperty("output.file", config.getOutputFile());
+        // 使用绝对路径
+        setAndDebugProperty("output.file", config.getAbsoluteOutputFile());
         setAndDebugProperty("max.depth", String.valueOf(config.getMaxDepth()));
         setAndDebugProperty("excluded.packages", config.getExcludedPackages());
         setAndDebugProperty("method.exceptions", config.getMethodExceptions());
@@ -276,13 +363,54 @@ public class DirectoryAnalyzerAction implements IObjectActionDelegate {
     }
     
     private void debugInfo(String message) {
-        System.out.println("[DirectoryAnalyzer-DEBUG] " + message);
+        String debugMsg = "[DirectoryAnalyzer-DEBUG] " + message;
+        
+        // 输出到System.out
+        System.out.println(debugMsg);
+        
+        // 也输出到Eclipse控制台
+        try {
+            org.eclipse.ui.console.IConsoleManager consoleManager = 
+                org.eclipse.ui.console.ConsolePlugin.getDefault().getConsoleManager();
+            
+            org.eclipse.ui.console.MessageConsole targetConsole = null;
+            org.eclipse.ui.console.IConsole[] consoles = consoleManager.getConsoles();
+            
+            for (org.eclipse.ui.console.IConsole existingConsole : consoles) {
+                if ("Java Dependency Analyzer".equals(existingConsole.getName())) {
+                    targetConsole = (org.eclipse.ui.console.MessageConsole) existingConsole;
+                    break;
+                }
+            }
+            
+            if (targetConsole == null) {
+                targetConsole = new org.eclipse.ui.console.MessageConsole("Java Dependency Analyzer", null);
+                consoleManager.addConsoles(new org.eclipse.ui.console.IConsole[]{targetConsole});
+            }
+            
+            org.eclipse.ui.console.MessageConsoleStream stream = targetConsole.newMessageStream();
+            stream.println(debugMsg);
+            
+            // 激活控制台视图 - 使用final变量
+            final org.eclipse.ui.console.MessageConsole finalConsole = targetConsole;
+            shell.getDisplay().asyncExec(() -> {
+                consoleManager.showConsoleView(finalConsole);
+            });
+            
+        } catch (Exception e) {
+            // 如果Eclipse控制台失败，至少保证System.out有输出
+            System.err.println("Failed to write to Eclipse console: " + e.getMessage());
+        }
     }
     
     private void debugError(String message, Exception e) {
-        System.err.println("[DirectoryAnalyzer-ERROR] " + message);
+        String errorMsg = "[DirectoryAnalyzer-ERROR] " + message;
+        System.err.println(errorMsg);
         if (e != null) {
             e.printStackTrace();
         }
+        
+        // 也输出到Eclipse控制台
+        debugInfo("ERROR: " + message + (e != null ? " - " + e.getMessage() : ""));
     }
 }

@@ -48,7 +48,7 @@ public class ConfigurationDialog extends Dialog {
     
     public ConfigurationDialog(Shell parentShell, PluginConfig config, boolean isClassMode, String presetValue) {
         super(parentShell);
-        this.config = new PluginConfig(config);
+        this.config = config;
         this.isClassMode = isClassMode;
         this.presetValue = presetValue;
         setShellStyle(getShellStyle() | SWT.RESIZE);
