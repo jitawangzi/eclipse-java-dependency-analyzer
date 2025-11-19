@@ -123,25 +123,22 @@ public class ClassAnalyzerAction implements IObjectActionDelegate {
             // 获取插件的类加载器
             ClassLoader pluginClassLoader = this.getClass().getClassLoader();
             debugInfo("插件类加载器: " + pluginClassLoader.getClass().getName());
-            
-            // 检查所有需要的jar文件
-            String[] requiredJars = {
-//                "lib/jdepend-analyzer.jar",
-//                "lib/javaparser-core-3.25.10.jar",
-//                "lib/slf4j-api-2.0.12.jar",
-//                "lib/logback-classic-1.5.6.jar",
-//                "lib/logback-core-1.5.6.jar"
-            };
-            
+            // 动态扫描 lib/ 下所有 JAR
             java.util.List<java.net.URL> validUrls = new java.util.ArrayList<>();
+            java.net.URL pluginJarUrl = getClass().getProtectionDomain().getCodeSource().getLocation();  // 插件 JAR 的 URL
+            debugInfo("插件 JAR URL: " + pluginJarUrl);
             
-            for (String jarPath : requiredJars) {
-                java.net.URL jarUrl = pluginClassLoader.getResource(jarPath);
-                if (jarUrl != null) {
-                    validUrls.add(jarUrl);
-                    debugInfo("找到JAR: " + jarPath);
-                } else {
-                    debugInfo("警告: 找不到JAR文件: " + jarPath);
+            try (java.io.InputStream jarStream = pluginJarUrl.openStream();
+                 java.util.zip.ZipInputStream zipInput = new java.util.zip.ZipInputStream(jarStream)) {
+                java.util.zip.ZipEntry entry;
+                while ((entry = zipInput.getNextEntry()) != null) {
+                    String name = entry.getName();
+                    if (name.startsWith("lib/") && name.endsWith(".jar") && !entry.isDirectory()) {
+                        // 构建内嵌 JAR 的 URL
+                        java.net.URL innerJarUrl = new java.net.URL("jar:" + pluginJarUrl + "!/" + name);
+                        validUrls.add(innerJarUrl);
+                        debugInfo("找到嵌入 JAR: " + name + " -> " + innerJarUrl);
+                    }
                 }
             }
             
