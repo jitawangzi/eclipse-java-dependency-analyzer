@@ -48,6 +48,7 @@ public class ConfigurationDialog extends Dialog {
     
     // 新添加：Checkbox 用于选择是否作为 Java 工程分析
     private Button isJavaProjectCheck;
+    private Button openOutputDirectoryCheck;
     
     public ConfigurationDialog(Shell parentShell, PluginConfig config, boolean isClassMode, String presetValue) {
         super(parentShell);
@@ -244,6 +245,13 @@ public class ConfigurationDialog extends Dialog {
         isJavaProjectCheck.setSelection(config.isJavaAnalysis());  // 从 config 读取初始值，默认 true
         isJavaProjectCheck.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
         isJavaProjectCheck.setToolTipText("If selected, will infer project root for full Java dependency analysis; otherwise, only analyze directory contents.");
+        
+        // 新添加：Checkbox 是否生成后打开所在目录
+        new Label(dirComposite, SWT.NONE).setText("Open Output Directory After Generation:");
+        openOutputDirectoryCheck = new Button(dirComposite, SWT.CHECK);
+        openOutputDirectoryCheck.setSelection(config.isOpenOutputDirectory());  // 从 config 读取初始值，默认 true
+        openOutputDirectoryCheck.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        openOutputDirectoryCheck.setToolTipText("");
         
         // 包含文件
         new Label(dirComposite, SWT.NONE).setText("Include Files:");

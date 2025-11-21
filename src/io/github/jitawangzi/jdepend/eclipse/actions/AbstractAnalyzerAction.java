@@ -16,6 +16,7 @@ import org.eclipse.jface.action.IAction;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.jface.viewers.ISelection;
 import org.eclipse.jface.viewers.IStructuredSelection;
+import org.eclipse.swt.program.Program;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.ui.IObjectActionDelegate;
 import org.eclipse.ui.IWorkbenchPart;
@@ -30,7 +31,7 @@ import io.github.jitawangzi.jdepend.eclipse.config.PluginConfig;
 
 /**
  * 分析器动作的抽象基类
- * 封装了通用的类加载、线程执行、日志记录和文件处理逻辑
+ * 封装了通用的类加载、线程执行、日志记录、文件处理及自动打开目录逻辑
  */
 public abstract class AbstractAnalyzerAction implements IObjectActionDelegate {
 
@@ -152,7 +153,7 @@ public abstract class AbstractAnalyzerAction implements IObjectActionDelegate {
             debugInfo("恢复工作目录");
         }
 
-        // 6. 检查结果
+        // 6. 检查结果并处理（包含打开目录逻辑）
         checkAndProcessOutputFile(config);
     }
 
@@ -236,14 +237,42 @@ public abstract class AbstractAnalyzerAction implements IObjectActionDelegate {
         final boolean fileExists = targetFile.exists();
         final long fileSize = fileExists ? targetFile.length() : 0;
 
+        // 在 UI 线程中显示结果并打开目录
         shell.getDisplay().asyncExec(() -> {
             if (fileExists) {
+                // 1. 弹出成功提示
                 MessageDialog.openInformation(shell, "Analysis Completed",
                         "分析完成！\n\n输出文件: " + targetFile.getName() + "\n大小: " + (fileSize / 1024) + " KB\n位置: " + targetFile.getParent());
+                
+                // 2. 自动打开文件所在目录 (默认开启)
+                if (shouldOpenOutputDirectory(config)) {
+                    try {
+                        File parentDir = targetFile.getParentFile();
+                        if (parentDir != null && parentDir.exists()) {
+                            debugInfo("正在打开输出目录: " + parentDir.getAbsolutePath());
+                            // 使用 SWT 的 Program.launch 打开系统资源管理器
+                            boolean launched = Program.launch(parentDir.getAbsolutePath());
+                            if (!launched) {
+                                debugInfo("警告: 系统无法启动资源管理器");
+                            }
+                        }
+                    } catch (Exception e) {
+                        debugError("打开输出目录失败", e);
+                    }
+                }
+                
             } else {
                 MessageDialog.openWarning(shell, "Analysis Completed", "分析已执行完成，但输出文件未生成。\n请检查控制台输出。");
             }
         });
+    }
+    
+    /**
+     * 判断是否需要自动打开输出目录
+     * 默认为 true，如果你在 PluginConfig 中添加了配置项，请在此处修改获取逻辑
+     */
+    protected boolean shouldOpenOutputDirectory(PluginConfig config) {
+        return config.isOpenOutputDirectory();
     }
 
     protected void putAndDebugProperty(Properties props, String key, String value) {
@@ -284,10 +313,6 @@ public abstract class AbstractAnalyzerAction implements IObjectActionDelegate {
             }
             MessageConsoleStream stream = targetConsole.newMessageStream();
             stream.println(msg);
-            
-            // 可选：自动显示控制台
-            // final MessageConsole finalConsole = targetConsole;
-            // shell.getDisplay().asyncExec(() -> consoleManager.showConsoleView(finalConsole));
         } catch (Exception e) {
             System.err.println("Failed to write to Eclipse console: " + e.getMessage());
         }

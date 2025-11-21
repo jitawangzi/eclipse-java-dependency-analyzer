@@ -10,7 +10,7 @@ public class PluginConfig {
     private int maxDepth = 8;
     private String excludedPackages = "";
     private String methodExceptions = "";
-    private int contentSizeThreshold = 100000;
+    private int contentSizeThreshold = 1000000;
     private boolean omitBeanMethods = false;
     private boolean showOmittedAccessors = false;
     private boolean importSkipEnabled = false;
@@ -18,6 +18,7 @@ public class PluginConfig {
     private String importKeepPrefixes = "io.vertx,io.github,org.apache,org.slf4j,org.springframework,com.google,javax.";
     private boolean showErrorStacktrace = false;
     private boolean isJavaAnalysis = true;
+    private boolean openOutputDirectory = true; // 默认为 true
     
     // 类分析配置
     private String mainClass = "";
@@ -278,6 +279,13 @@ public class PluginConfig {
 
 	public void setJavaAnalysis(boolean isJavaAnalysis) {
 		this.isJavaAnalysis = isJavaAnalysis;
+	}
+	public boolean isOpenOutputDirectory() {
+	    return openOutputDirectory;
+	}
+
+	public void setOpenOutputDirectory(boolean openOutputDirectory) {
+	    this.openOutputDirectory = openOutputDirectory;
 	}
     
 }
