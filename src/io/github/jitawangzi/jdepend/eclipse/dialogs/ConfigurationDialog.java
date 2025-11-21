@@ -46,6 +46,9 @@ public class ConfigurationDialog extends Dialog {
     private Text directoryExcludeFoldersText;
     private Text directoryAllowedExtensionsText;
     
+    // 新添加：Checkbox 用于选择是否作为 Java 工程分析
+    private Button isJavaProjectCheck;
+    
     public ConfigurationDialog(Shell parentShell, PluginConfig config, boolean isClassMode, String presetValue) {
         super(parentShell);
         this.config = config;
@@ -235,6 +238,13 @@ public class ConfigurationDialog extends Dialog {
         simplifyMethodsCheck = new Button(dirComposite, SWT.CHECK);
         simplifyMethodsCheck.setSelection(config.isSimplifyMethods());
         
+        // 新添加：Checkbox 用于选择是否作为 Java 工程分析
+        new Label(dirComposite, SWT.NONE).setText("As Java Project Analysis (Requires Project Root):");
+        isJavaProjectCheck = new Button(dirComposite, SWT.CHECK);
+        isJavaProjectCheck.setSelection(config.isJavaAnalysis());  // 从 config 读取初始值，默认 true
+        isJavaProjectCheck.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        isJavaProjectCheck.setToolTipText("If selected, will infer project root for full Java dependency analysis; otherwise, only analyze directory contents.");
+        
         // 包含文件
         new Label(dirComposite, SWT.NONE).setText("Include Files:");
         directoryIncludeFilesText = new Text(dirComposite, SWT.BORDER);
@@ -317,6 +327,9 @@ public class ConfigurationDialog extends Dialog {
             config.setDirectoryIncludeFolders(directoryIncludeFoldersText.getText());
             config.setDirectoryExcludeFolders(directoryExcludeFoldersText.getText());
             config.setDirectoryAllowedExtensions(directoryAllowedExtensionsText.getText());
+            
+            // 新添加：保存 Checkbox 状态
+            config.setJavaAnalysis(isJavaProjectCheck.getSelection());
         }
         
         super.okPressed();
@@ -326,4 +339,3 @@ public class ConfigurationDialog extends Dialog {
         return config;
     }
 }
-

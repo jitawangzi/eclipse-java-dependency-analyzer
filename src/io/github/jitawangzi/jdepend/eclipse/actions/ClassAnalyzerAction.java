@@ -1,5 +1,7 @@
 package io.github.jitawangzi.jdepend.eclipse.actions;
 
+import java.util.Properties;
+
 import org.eclipse.core.resources.IFile;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.JavaCore;
@@ -12,6 +14,7 @@ import org.eclipse.swt.widgets.Shell;
 import org.eclipse.ui.IObjectActionDelegate;
 import org.eclipse.ui.IWorkbenchPart;
 
+import io.github.jitawangzi.jdepend.config.AppConfigManager;
 import io.github.jitawangzi.jdepend.eclipse.config.PluginConfig;
 import io.github.jitawangzi.jdepend.eclipse.dialogs.ConfigurationDialog;
 import io.github.jitawangzi.jdepend.eclipse.utils.EclipseProjectUtils;
@@ -96,7 +99,8 @@ public class ClassAnalyzerAction implements IObjectActionDelegate {
         debugInfo("开始执行类分析，主类: " + config.getMainClass());
         
         // 设置系统属性
-        setSystemPropertiesFromConfig(config);
+        Properties systemPropertiesFromConfigForClassMode = buildSystemPropertiesFromConfigForClassMode(config);
+        AppConfigManager.reload(systemPropertiesFromConfigForClassMode);
         
         // 在后台线程中执行分析
         Thread analysisThread = new Thread(() -> {
@@ -279,6 +283,53 @@ public class ClassAnalyzerAction implements IObjectActionDelegate {
     private void setAndDebugProperty(String key, String value) {
         System.setProperty(key, value);
         debugInfo("  " + key + " = " + value);
+    }
+    /**
+     * 根据 PluginConfig 生成一份用于“类分析”的 Properties，
+     * 不再直接调用 System.setProperty。
+     */
+    private Properties buildSystemPropertiesFromConfigForClassMode(PluginConfig config) {
+        debugInfo("设置系统属性配置...");
+
+        Properties props = new Properties();
+
+        // 类分析配置
+        putAndDebugProperty(props, "main.class", config.getMainClass());
+        putAndDebugProperty(props, "project.root", config.getProjectRoot());
+        putAndDebugProperty(props, "project.package.prefixes", config.getProjectPackagePrefixes());
+        putAndDebugProperty(props, "method.body.max.depth", String.valueOf(config.getMethodBodyMaxDepth()));
+        putAndDebugProperty(props, "keep.only.referenced.methods", String.valueOf(config.isKeepOnlyReferencedMethods()));
+        putAndDebugProperty(props, "show.removed.methods", String.valueOf(config.isShowRemovedMethods()));
+        putAndDebugProperty(props, "source.directories", config.getSourceDirectories());
+        putAndDebugProperty(props, "directory.mode.enabled", "false");
+
+        // 通用配置
+        putAndDebugProperty(props, "output.file", config.getAbsoluteOutputFile());
+        putAndDebugProperty(props, "max.depth", String.valueOf(config.getMaxDepth()));
+        putAndDebugProperty(props, "excluded.packages", config.getExcludedPackages());
+        putAndDebugProperty(props, "method.exceptions", config.getMethodExceptions());
+        putAndDebugProperty(props, "content.size.threshold", String.valueOf(config.getContentSizeThreshold()));
+        putAndDebugProperty(props, "omit.bean.methods", String.valueOf(config.isOmitBeanMethods()));
+        putAndDebugProperty(props, "show.omitted.accessors", String.valueOf(config.isShowOmittedAccessors()));
+        putAndDebugProperty(props, "import.skip.enabled", String.valueOf(config.isImportSkipEnabled()));
+        putAndDebugProperty(props, "import.skip.prefixes", config.getImportSkipPrefixes());
+        putAndDebugProperty(props, "import.keep.prefixes", config.getImportKeepPrefixes());
+        putAndDebugProperty(props, "show.error.stacktrace", String.valueOf(config.isShowErrorStacktrace()));
+
+        return props;
+    }
+
+    /**
+     * 往 Properties 里设置并打印日志。
+     */
+    private void putAndDebugProperty(Properties props, String key, String value) {
+        if (value != null) {
+            props.setProperty(key, value);
+            debugInfo("  " + key + " = " + value);
+        } else {
+            // 如果不希望出现 null，可以选择跳过或设为空串
+            debugInfo("  " + key + " = <null> (跳过设置)");
+        }
     }
     
     private void debugInfo(String message) {

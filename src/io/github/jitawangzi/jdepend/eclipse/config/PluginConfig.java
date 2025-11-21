@@ -17,6 +17,7 @@ public class PluginConfig {
     private String importSkipPrefixes = "";
     private String importKeepPrefixes = "io.vertx,io.github,org.apache,org.slf4j,org.springframework,com.google,javax.";
     private boolean showErrorStacktrace = false;
+    private boolean isJavaAnalysis = true;
     
     // 类分析配置
     private String mainClass = "";
@@ -34,7 +35,7 @@ public class PluginConfig {
     private String directoryExcludeFiles = "";
     private String directoryIncludeFolders = "";
     private String directoryExcludeFolders = "";
-    private String directoryAllowedExtensions = ".java,.js,.ts,.py,.cpp,.c,.h,.hpp,.cs,.php,.rb,.go,.rs,.kt,.scala,.groovy";
+    private String directoryAllowedExtensions = "java,js,ts,py,cpp,c,h,hpp,cs,php,rb,go,rs,kt,scala,groovy";
     
     // 默认构造函数
     public PluginConfig() {
@@ -270,5 +271,14 @@ public class PluginConfig {
     public void setDirectoryAllowedExtensions(String directoryAllowedExtensions) {
         this.directoryAllowedExtensions = directoryAllowedExtensions;
     }
+
+	public boolean isJavaAnalysis() {
+		return isJavaAnalysis;
+	}
+
+	public void setJavaAnalysis(boolean isJavaAnalysis) {
+		this.isJavaAnalysis = isJavaAnalysis;
+	}
+    
 }
 
