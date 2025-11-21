@@ -7,7 +7,7 @@ public class PluginConfig {
     
     // 通用配置
     private String outputFile = "output.md";
-    private int maxDepth = 2;
+    private int maxDepth = 8;
     private String excludedPackages = "";
     private String methodExceptions = "";
     private int contentSizeThreshold = 100000;
