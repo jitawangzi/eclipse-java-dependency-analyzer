@@ -27,7 +27,6 @@ public class ConfigMapper {
         } else {
             // 目录模式配置
             props.setProperty("directory.path", config.getDirectoryPath());
-            props.setProperty("simplify.methods", String.valueOf(config.isSimplifyMethods()));
             props.setProperty("directory.include.files", config.getDirectoryIncludeFiles());
             props.setProperty("directory.exclude.files", config.getDirectoryExcludeFiles());
             props.setProperty("directory.include.folders", config.getDirectoryIncludeFolders());
@@ -36,6 +35,7 @@ public class ConfigMapper {
         }
         
         // 通用配置
+        props.setProperty("simplify.methods", String.valueOf(config.isSimplifyMethods()));
         props.setProperty("output.file", config.getOutputFile());
         props.setProperty("max.depth", String.valueOf(config.getMaxDepth()));
         props.setProperty("excluded.packages", config.getExcludedPackages());

@@ -157,6 +157,10 @@ public class ConfigurationDialog extends Dialog {
         commonComposite.setLayout(new GridLayout(2, false));
         commonTab.setControl(commonComposite);
         
+        // 简化方法
+        new Label(commonComposite, SWT.NONE).setText("Simplify Methods:");
+        simplifyMethodsCheck = new Button(commonComposite, SWT.CHECK);
+        simplifyMethodsCheck.setSelection(config.isSimplifyMethods());
         // 输出文件
         new Label(commonComposite, SWT.NONE).setText("Output File:");
         outputFileText = new Text(commonComposite, SWT.BORDER);
@@ -218,6 +222,15 @@ public class ConfigurationDialog extends Dialog {
         new Label(commonComposite, SWT.NONE).setText("Show Error Stacktrace:");
         showErrorStacktraceCheck = new Button(commonComposite, SWT.CHECK);
         showErrorStacktraceCheck.setSelection(config.isShowErrorStacktrace());
+        
+        // 新添加：Checkbox 是否生成后打开所在目录
+        new Label(commonComposite, SWT.NONE).setText("Open Output Directory After Generation:");
+        openOutputDirectoryCheck = new Button(commonComposite, SWT.CHECK);
+        openOutputDirectoryCheck.setSelection(config.isOpenOutputDirectory());  // 从 config 读取初始值，默认 true
+        openOutputDirectoryCheck.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
+        openOutputDirectoryCheck.setToolTipText("");
+
+        
     }
     
     private void createDirectoryAnalysisTab(TabFolder tabFolder) {
@@ -234,24 +247,12 @@ public class ConfigurationDialog extends Dialog {
         directoryPathText.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
         directoryPathText.setText(config.getDirectoryPath());
         
-        // 简化方法
-        new Label(dirComposite, SWT.NONE).setText("Simplify Methods:");
-        simplifyMethodsCheck = new Button(dirComposite, SWT.CHECK);
-        simplifyMethodsCheck.setSelection(config.isSimplifyMethods());
-        
         // 新添加：Checkbox 用于选择是否作为 Java 工程分析
         new Label(dirComposite, SWT.NONE).setText("As Java Project Analysis (Requires Project Root):");
         isJavaProjectCheck = new Button(dirComposite, SWT.CHECK);
         isJavaProjectCheck.setSelection(config.isJavaAnalysis());  // 从 config 读取初始值，默认 true
         isJavaProjectCheck.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
         isJavaProjectCheck.setToolTipText("If selected, will infer project root for full Java dependency analysis; otherwise, only analyze directory contents.");
-        
-        // 新添加：Checkbox 是否生成后打开所在目录
-        new Label(dirComposite, SWT.NONE).setText("Open Output Directory After Generation:");
-        openOutputDirectoryCheck = new Button(dirComposite, SWT.CHECK);
-        openOutputDirectoryCheck.setSelection(config.isOpenOutputDirectory());  // 从 config 读取初始值，默认 true
-        openOutputDirectoryCheck.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false));
-        openOutputDirectoryCheck.setToolTipText("");
         
         // 包含文件
         new Label(dirComposite, SWT.NONE).setText("Include Files:");
